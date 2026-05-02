@@ -42,7 +42,7 @@ public class SpearListener implements Listener {
     }
 
     // -------------------------------------------------------------------------
-    // Player kill with spear -> upgrade one tier
+    // Player kill with spear -> upgrade one tier.
     // -------------------------------------------------------------------------
     @EventHandler
     public void onEntityDeath(EntityDeathEvent event) {
