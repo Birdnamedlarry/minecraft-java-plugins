@@ -1,10 +1,10 @@
 # SpearUpgradesCow
 
-Spigot/Paper plugin: players get a custom spear that upgrades each time they kill a cow with it. Tiers, lunge, Sharpness, and bonus damage are configured in `src/main/resources/config.yml`.
+Spigot/Paper plugin: players get a custom spear that upgrades each time they kill a cow with it. Tiers, spear material, vanilla Lunge, Sharpness, and bonus damage are configured in `src/main/resources/config.yml`.
 
 ## Requirements
 
-- **Java 17** (matches `pom.xml`)
+- **Java 21** (matches `pom.xml` and current Minecraft server requirements)
 - **Apache Maven** 3.x
 
 ## Build the plugin JAR

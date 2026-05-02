@@ -13,15 +13,22 @@
 #   &r reset
 #
 # -----------------------------------------------------------------------------
-# Lunge (custom dash toward the mob when you hit with the spear)
+# Material
+#   Native Minecraft spear material for this tier. Supported vanilla options:
+#   WOODEN_SPEAR, STONE_SPEAR, COPPER_SPEAR, IRON_SPEAR, GOLDEN_SPEAR,
+#   DIAMOND_SPEAR, NETHERITE_SPEAR.
+#
+# -----------------------------------------------------------------------------
+# Lunge
+#   Vanilla Minecraft Lunge enchantment applied to the spear item.
 #   0 = disabled
-#   2 = medium push (like the old “Lunge II”)
-#   3 = stronger push (“Lunge III”)
-# You can use other positive numbers; strength scales with this number.
+#   1 = Lunge I
+#   2 = Lunge II
+#   3 = Lunge III
 #
 # -----------------------------------------------------------------------------
 # Sharpness
-#   Vanilla Sharpness on the trident. 0 = no enchant on the item.
+#   Vanilla Sharpness on the spear. 0 = no enchant on the item.
 #   In vanilla Minecraft the level is capped at V (5) on the item itself.
 #
 # -----------------------------------------------------------------------------
@@ -45,6 +52,7 @@ levels:
     display-name: "&6Basic Wooden Spear"
     flavor: "&7A crude spear carved from wood."
     tier: "Tier 1"
+    material: WOODEN_SPEAR
     lunge: 0
     sharpness: 0
     bonus-damage: 0.0
@@ -54,6 +62,7 @@ levels:
     display-name: "&7Stone Spear"
     flavor: "&7A sturdy stone-tipped spear."
     tier: "Tier 2"
+    material: STONE_SPEAR
     lunge: 2
     sharpness: 0
     bonus-damage: 0.0
@@ -64,6 +73,7 @@ levels:
     display-name: "&fIron Spear"
     flavor: "&7A razor-sharp iron spear."
     tier: "Tier 3"
+    material: IRON_SPEAR
     lunge: 2
     sharpness: 2
     bonus-damage: 0.0
@@ -75,6 +85,7 @@ levels:
     display-name: "&bDiamond Spear"
     flavor: "&7A brilliant diamond-forged spear."
     tier: "Tier 4"
+    material: DIAMOND_SPEAR
     lunge: 3
     sharpness: 5
     bonus-damage: 0.0
@@ -86,6 +97,7 @@ levels:
     display-name: "&4Netherite Spear"
     flavor: "&7An unstoppable spear forged in hellfire."
     tier: "Tier 5 (MAX)"
+    material: NETHERITE_SPEAR
     lunge: 3
     sharpness: 5
     bonus-damage: 3.0

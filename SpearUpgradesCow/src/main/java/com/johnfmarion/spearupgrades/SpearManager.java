@@ -66,6 +66,7 @@ public class SpearManager {
         String displayName = translate(sec.getString("display-name", "&7Spear"));
         String flavor = translate(sec.getString("flavor", ""));
         String tier = sec.getString("tier", "Tier " + level);
+        Material material = readMaterial(sec.getString("material"), level);
         int lunge = Math.max(0, sec.getInt("lunge", 0));
         int sharpness = Math.max(0, sec.getInt("sharpness", 0));
         double bonus = sec.getDouble("bonus-damage", 0.0);
@@ -74,7 +75,30 @@ public class SpearManager {
         for (String line : rawLore) {
             enchantLore.add(translate(line));
         }
-        return new SpearLevelDefinition(displayName, flavor, tier, lunge, sharpness, bonus, enchantLore);
+        return new SpearLevelDefinition(displayName, flavor, tier, material, lunge, sharpness, bonus, enchantLore);
+    }
+
+    private Material readMaterial(String rawMaterial, int level) {
+        if (rawMaterial != null && !rawMaterial.isBlank()) {
+            Material material = Material.matchMaterial(rawMaterial);
+            if (material != null) {
+                return material;
+            }
+            plugin.getLogger().warning("config.yml: unknown material '" + rawMaterial
+                    + "' for levels." + level + ". Using built-in spear material for that tier.");
+        }
+        return defaultMaterial(level);
+    }
+
+    private Material defaultMaterial(int level) {
+        return switch (level) {
+            case 1 -> Material.WOODEN_SPEAR;
+            case 2 -> Material.STONE_SPEAR;
+            case 3 -> Material.IRON_SPEAR;
+            case 4 -> Material.DIAMOND_SPEAR;
+            case 5 -> Material.NETHERITE_SPEAR;
+            default -> Material.WOODEN_SPEAR;
+        };
     }
 
     /** Matches original plugin defaults when a tier section is absent. */
@@ -83,31 +107,31 @@ public class SpearManager {
             case 1 -> new SpearLevelDefinition(
                     ChatColor.GOLD + "Basic Wooden Spear",
                     ChatColor.GRAY + "A crude spear carved from wood.",
-                    "Tier 1", 0, 0, 0.0, List.of());
+                    "Tier 1", Material.WOODEN_SPEAR, 0, 0, 0.0, List.of());
             case 2 -> new SpearLevelDefinition(
                     ChatColor.GRAY + "Stone Spear",
                     ChatColor.GRAY + "A sturdy stone-tipped spear.",
-                    "Tier 2", 2, 0, 0.0,
+                    "Tier 2", Material.STONE_SPEAR, 2, 0, 0.0,
                     List.of(ChatColor.AQUA + "Lunge II"));
             case 3 -> new SpearLevelDefinition(
                     ChatColor.WHITE + "Iron Spear",
                     ChatColor.GRAY + "A razor-sharp iron spear.",
-                    "Tier 3", 2, 2, 0.0,
+                    "Tier 3", Material.IRON_SPEAR, 2, 2, 0.0,
                     List.of(ChatColor.AQUA + "Lunge II", ChatColor.YELLOW + "Sharpness II"));
             case 4 -> new SpearLevelDefinition(
                     ChatColor.AQUA + "Diamond Spear",
                     ChatColor.GRAY + "A brilliant diamond-forged spear.",
-                    "Tier 4", 3, 5, 0.0,
+                    "Tier 4", Material.DIAMOND_SPEAR, 3, 5, 0.0,
                     List.of(ChatColor.AQUA + "Lunge III", ChatColor.YELLOW + "Sharpness V"));
             case 5 -> new SpearLevelDefinition(
                     ChatColor.DARK_RED + "Netherite Spear",
                     ChatColor.GRAY + "An unstoppable spear forged in hellfire.",
-                    "Tier 5 (MAX)", 3, 5, 3.0,
+                    "Tier 5 (MAX)", Material.NETHERITE_SPEAR, 3, 5, 3.0,
                     List.of(ChatColor.AQUA + "Lunge III", ChatColor.YELLOW + "Sharpness X"));
             default -> new SpearLevelDefinition(
                     ChatColor.GRAY + "Spear",
                     "",
-                    "Tier " + level, 0, 0, 0.0, List.of());
+                    "Tier " + level, defaultMaterial(level), 0, 0, 0.0, List.of());
         };
     }
 
@@ -149,14 +173,19 @@ public class SpearManager {
             def = builtinDefault(Math.min(5, Math.max(1, level)));
         }
 
-        ItemStack spear = new ItemStack(Material.TRIDENT);
+        ItemStack spear = new ItemStack(def.material());
         ItemMeta meta = spear.getItemMeta();
         meta.setDisplayName(def.displayName());
         meta.setLore(buildLore(def));
 
+        int lunge = def.lunge();
+        if (lunge > 0) {
+            meta.addEnchant(Enchantment.LUNGE, lunge, true);
+        }
+
         int sharp = def.sharpness();
         if (sharp > 0) {
-            meta.addEnchant(Enchantment.DAMAGE_ALL, sharp, true);
+            meta.addEnchant(Enchantment.SHARPNESS, sharp, true);
         }
 
         meta.getPersistentDataContainer().set(spearLevelKey, PersistentDataType.INTEGER, level);
@@ -177,12 +206,6 @@ public class SpearManager {
         return lore;
     }
 
-    /** Lunge strength: 0 = none; higher = stronger dash (see config comments). */
-    public int getLungeLevel(int spearLevel) {
-        SpearLevelDefinition def = levelDefinitions.get(spearLevel);
-        return def != null ? def.lunge() : 0;
-    }
-
     /** Extra damage added each hit (on top of vanilla + Sharpness). */
     public double getBonusDamage(int spearLevel) {
         SpearLevelDefinition def = levelDefinitions.get(spearLevel);
@@ -196,12 +219,13 @@ public class SpearManager {
     }
 
     /**
-     * One tier’s name, lore lines, lunge power, Sharpness on the item, and bonus hit damage.
+     * One tier’s name, material, lore lines, Lunge/Sharpness enchantments, and bonus hit damage.
      */
     public record SpearLevelDefinition(
             String displayName,
             String flavor,
             String tierRaw,
+            Material material,
             int lunge,
             int sharpness,
             double bonusDamage,
