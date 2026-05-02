@@ -12,7 +12,6 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -67,8 +66,8 @@ public class SpearListener implements Listener {
     }
 
     // -------------------------------------------------------------------------
-    // Lunge: propel the player toward their target on each spear hit
-    // Bonus damage: simulate Sharpness X on the Netherite Spear
+    // Bonus damage: simulate Sharpness X on the Netherite Spear.
+    // Vanilla Lunge is applied directly as an enchantment when spears are created.
     // -------------------------------------------------------------------------
     @EventHandler(priority = EventPriority.NORMAL)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
@@ -79,18 +78,6 @@ public class SpearListener implements Listener {
         if (!spearManager.isSpear(weapon)) return;
 
         int level = spearManager.getSpearLevel(weapon);
-
-        // Lunge: push the attacker toward the target
-        int lunge = spearManager.getLungeLevel(level);
-        if (lunge > 0) {
-            Entity target = event.getEntity();
-            Vector dir = target.getLocation().toVector()
-                    .subtract(player.getLocation().toVector())
-                    .normalize()
-                    .multiply(0.45 * lunge);
-            dir.setY(0.25);
-            player.setVelocity(player.getVelocity().add(dir));
-        }
 
         // Extra damage for Netherite Spear (Sharpness X simulation)
         double bonus = spearManager.getBonusDamage(level);
