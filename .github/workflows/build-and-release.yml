@@ -1,0 +1,83 @@
+name: Build and Release Plugins
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build all Maven plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          found=0
+          while IFS= read -r pom; do
+            found=1
+            plugin_dir="$(dirname "$pom")"
+            echo "Building $plugin_dir"
+            mvn -B -f "$pom" clean package
+          done < <(find . -mindepth 2 -maxdepth 3 -name pom.xml | sort)
+
+          if [[ "$found" -eq 0 ]]; then
+            echo "No plugin pom.xml files found."
+            exit 1
+          fi
+
+      - name: Collect JAR artifacts
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          mkdir -p release-assets
+          mapfile -t jars < <(
+            find . -type f -path "*/target/*.jar" \
+              ! -name "*-sources.jar" \
+              ! -name "*-javadoc.jar" \
+              ! -name "original-*.jar" \
+              | sort
+          )
+
+          if [[ "${#jars[@]}" -eq 0 ]]; then
+            echo "No JAR files found after build."
+            exit 1
+          fi
+
+          for jar in "${jars[@]}"; do
+            plugin_name="$(basename "$(dirname "$(dirname "$jar")")")"
+            jar_name="$(basename "$jar")"
+            cp "$jar" "release-assets/${plugin_name}-${jar_name}"
+          done
+
+          echo "Collected assets:"
+          ls -1 release-assets
+
+      - name: Create GitHub release and upload JARs
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: main-${{ github.sha }}
+          name: Main build ${{ github.sha }}
+          generate_release_notes: true
+          prerelease: true
+          files: release-assets/*.jar

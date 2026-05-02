@@ -1,0 +1,6 @@
+name: SpearUpgradesCow
+version: '${project.version}'
+main: com.johnfmarion.spearupgrades.SpearUpgradesCow
+api-version: 1.20
+description: Kill cows with spears to upgrade them. Die and lose a tier.
+authors: [SpearPlugin]

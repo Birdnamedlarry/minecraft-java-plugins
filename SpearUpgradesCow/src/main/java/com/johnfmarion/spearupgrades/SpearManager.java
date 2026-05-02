@@ -1,0 +1,214 @@
+package com.johnfmarion.spearupgrades;
+
+import org.bukkit.ChatColor;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class SpearManager {
+
+    private final SpearUpgradesCow plugin;
+    private final NamespacedKey spearLevelKey;
+
+    private int minLevel = 1;
+    private int maxLevel = 5;
+    private final Map<Integer, SpearLevelDefinition> levelDefinitions = new HashMap<>();
+
+    public SpearManager(SpearUpgradesCow plugin) {
+        this.plugin = plugin;
+        this.spearLevelKey = new NamespacedKey(plugin, "spear_level");
+    }
+
+    /**
+     * Reads {@code config.yml} (paths {@code min-level}, {@code max-level}, {@code levels.<n>}).
+     * Call after {@link org.bukkit.plugin.java.JavaPlugin#saveDefaultConfig()} on first run.
+     */
+    public void loadFromConfig() {
+        plugin.reloadConfig();
+        var cfg = plugin.getConfig();
+
+        minLevel = Math.max(1, cfg.getInt("min-level", 1));
+        maxLevel = Math.max(minLevel, cfg.getInt("max-level", 5));
+
+        levelDefinitions.clear();
+        ConfigurationSection levelsRoot = cfg.getConfigurationSection("levels");
+        if (levelsRoot == null) {
+            plugin.getLogger().severe("config.yml: missing 'levels' section. Using built-in defaults for all tiers.");
+            for (int lv = minLevel; lv <= maxLevel; lv++) {
+                levelDefinitions.put(lv, builtinDefault(lv));
+            }
+            return;
+        }
+
+        for (int lv = minLevel; lv <= maxLevel; lv++) {
+            ConfigurationSection sec = levelsRoot.getConfigurationSection(String.valueOf(lv));
+            if (sec == null) {
+                plugin.getLogger().warning("config.yml: missing levels." + lv + ". Using built-in default for that tier.");
+                levelDefinitions.put(lv, builtinDefault(lv));
+            } else {
+                levelDefinitions.put(lv, readLevelSection(sec, lv));
+            }
+        }
+    }
+
+    private SpearLevelDefinition readLevelSection(ConfigurationSection sec, int level) {
+        String displayName = translate(sec.getString("display-name", "&7Spear"));
+        String flavor = translate(sec.getString("flavor", ""));
+        String tier = sec.getString("tier", "Tier " + level);
+        int lunge = Math.max(0, sec.getInt("lunge", 0));
+        int sharpness = Math.max(0, sec.getInt("sharpness", 0));
+        double bonus = sec.getDouble("bonus-damage", 0.0);
+        List<String> rawLore = sec.getStringList("enchant-lore");
+        List<String> enchantLore = new ArrayList<>();
+        for (String line : rawLore) {
+            enchantLore.add(translate(line));
+        }
+        return new SpearLevelDefinition(displayName, flavor, tier, lunge, sharpness, bonus, enchantLore);
+    }
+
+    /** Matches original plugin defaults when a tier section is absent. */
+    private SpearLevelDefinition builtinDefault(int level) {
+        return switch (level) {
+            case 1 -> new SpearLevelDefinition(
+                    ChatColor.GOLD + "Basic Wooden Spear",
+                    ChatColor.GRAY + "A crude spear carved from wood.",
+                    "Tier 1", 0, 0, 0.0, List.of());
+            case 2 -> new SpearLevelDefinition(
+                    ChatColor.GRAY + "Stone Spear",
+                    ChatColor.GRAY + "A sturdy stone-tipped spear.",
+                    "Tier 2", 2, 0, 0.0,
+                    List.of(ChatColor.AQUA + "Lunge II"));
+            case 3 -> new SpearLevelDefinition(
+                    ChatColor.WHITE + "Iron Spear",
+                    ChatColor.GRAY + "A razor-sharp iron spear.",
+                    "Tier 3", 2, 2, 0.0,
+                    List.of(ChatColor.AQUA + "Lunge II", ChatColor.YELLOW + "Sharpness II"));
+            case 4 -> new SpearLevelDefinition(
+                    ChatColor.AQUA + "Diamond Spear",
+                    ChatColor.GRAY + "A brilliant diamond-forged spear.",
+                    "Tier 4", 3, 5, 0.0,
+                    List.of(ChatColor.AQUA + "Lunge III", ChatColor.YELLOW + "Sharpness V"));
+            case 5 -> new SpearLevelDefinition(
+                    ChatColor.DARK_RED + "Netherite Spear",
+                    ChatColor.GRAY + "An unstoppable spear forged in hellfire.",
+                    "Tier 5 (MAX)", 3, 5, 3.0,
+                    List.of(ChatColor.AQUA + "Lunge III", ChatColor.YELLOW + "Sharpness X"));
+            default -> new SpearLevelDefinition(
+                    ChatColor.GRAY + "Spear",
+                    "",
+                    "Tier " + level, 0, 0, 0.0, List.of());
+        };
+    }
+
+    private static String translate(String raw) {
+        if (raw == null) return "";
+        return ChatColor.translateAlternateColorCodes('&', raw);
+    }
+
+    public NamespacedKey getSpearLevelKey() {
+        return spearLevelKey;
+    }
+
+    public int getMinLevel() {
+        return minLevel;
+    }
+
+    public int getMaxLevel() {
+        return maxLevel;
+    }
+
+    public boolean isSpear(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return false;
+        if (!item.hasItemMeta()) return false;
+        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+        return pdc.has(spearLevelKey, PersistentDataType.INTEGER);
+    }
+
+    public int getSpearLevel(ItemStack item) {
+        if (!isSpear(item)) return 0;
+        return item.getItemMeta().getPersistentDataContainer()
+                .getOrDefault(spearLevelKey, PersistentDataType.INTEGER, minLevel);
+    }
+
+    public ItemStack createSpear(int level) {
+        level = Math.max(minLevel, Math.min(maxLevel, level));
+        SpearLevelDefinition def = levelDefinitions.get(level);
+        if (def == null) {
+            plugin.getLogger().warning("No definition for spear level " + level + "; clamped data may be stale.");
+            def = builtinDefault(Math.min(5, Math.max(1, level)));
+        }
+
+        ItemStack spear = new ItemStack(Material.TRIDENT);
+        ItemMeta meta = spear.getItemMeta();
+        meta.setDisplayName(def.displayName());
+        meta.setLore(buildLore(def));
+
+        int sharp = def.sharpness();
+        if (sharp > 0) {
+            meta.addEnchant(Enchantment.DAMAGE_ALL, sharp, true);
+        }
+
+        meta.getPersistentDataContainer().set(spearLevelKey, PersistentDataType.INTEGER, level);
+        spear.setItemMeta(meta);
+        return spear;
+    }
+
+    private List<String> buildLore(SpearLevelDefinition def) {
+        List<String> lore = new ArrayList<>();
+        if (!def.flavor().isEmpty()) {
+            lore.add(def.flavor());
+        }
+        lore.add(ChatColor.DARK_GRAY + translate(def.tierRaw()));
+        if (!def.enchantLore().isEmpty()) {
+            lore.add("");
+            lore.addAll(def.enchantLore());
+        }
+        return lore;
+    }
+
+    /** Lunge strength: 0 = none; higher = stronger dash (see config comments). */
+    public int getLungeLevel(int spearLevel) {
+        SpearLevelDefinition def = levelDefinitions.get(spearLevel);
+        return def != null ? def.lunge() : 0;
+    }
+
+    /** Extra damage added each hit (on top of vanilla + Sharpness). */
+    public double getBonusDamage(int spearLevel) {
+        SpearLevelDefinition def = levelDefinitions.get(spearLevel);
+        return def != null ? def.bonusDamage() : 0.0;
+    }
+
+    public String getDisplayName(int level) {
+        SpearLevelDefinition def = levelDefinitions.get(level);
+        if (def != null) return def.displayName();
+        return ChatColor.GRAY + "Spear";
+    }
+
+    /**
+     * One tier’s name, lore lines, lunge power, Sharpness on the item, and bonus hit damage.
+     */
+    public record SpearLevelDefinition(
+            String displayName,
+            String flavor,
+            String tierRaw,
+            int lunge,
+            int sharpness,
+            double bonusDamage,
+            List<String> enchantLore
+    ) {
+        public SpearLevelDefinition {
+            enchantLore = Collections.unmodifiableList(new ArrayList<>(enchantLore));
+        }
+    }
+}
